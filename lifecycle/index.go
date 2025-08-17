@@ -16,8 +16,9 @@ import (
 // components. Create a new instance using New(), and then have your components
 // listen to the context provided by the LifecycleManager to know when to shut down.
 type LifecycleManager struct {
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx           context.Context
+	cancel        context.CancelFunc
+	exitCallbacks []func()
 }
 
 // New creates and returns a new LifecycleManager.
@@ -59,6 +60,9 @@ func New() *LifecycleManager {
 //	log.Println("Application finished shutting down.")
 func (lifecycle *LifecycleManager) Wait() {
 	<-lifecycle.ctx.Done()
+	for _, callback := range lifecycle.exitCallbacks {
+		callback()
+	}
 }
 
 // Exit initiates a graceful shutdown of the application.
@@ -128,6 +132,28 @@ func (lifecycle *LifecycleManager) Exitf(format string, v ...any) {
 func (lifecycle *LifecycleManager) Exitln(v ...any) {
 	log.Println(v...)
 	lifecycle.cancel()
+}
+
+// OnExit registers a function to be executed when the application is shutting down.
+//
+// You can call this function multiple times to register multiple cleanup tasks.
+// The registered functions will be executed in the order they were registered.
+// This is useful for tasks like closing database connections, flushing logs, or
+// waiting for background goroutines to finish.
+//
+// Example:
+//
+//	lifecycle.OnExit(func() {
+//	    log.Println("Closing database connection...")
+//	    db.Close()
+//	})
+//
+//	lifecycle.OnExit(func() {
+//	    log.Println("Shutting down HTTP server...")
+//	    server.Shutdown(context.Background())
+//	})
+func (lifecycle *LifecycleManager) OnExit(callback func()) {
+	lifecycle.exitCallbacks = append(lifecycle.exitCallbacks, callback)
 }
 
 func (lifecycle *LifecycleManager) handleSignals() {
