@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
 // Package lifecycle provides a simple way to manage the lifecycle of your
@@ -49,11 +48,6 @@ func New() *LifecycleManager {
 // Wait blocks the current goroutine until the application receives a termination
 // signal (SIGINT or SIGTERM) or one of the Exit functions is called.
 //
-// The optional duration 'd' allows you to specify a delay after the shutdown
-// signal is received before this function returns. This can be useful to give
-// your application components some time to gracefully shut down. If 'd' is zero,
-// it returns immediately after the context is cancelled.
-//
 // Call this function in your main goroutine to keep the application running
 // until a shutdown is initiated.
 //
@@ -61,13 +55,10 @@ func New() *LifecycleManager {
 //
 //	lifecycle := lifecycle.New()
 //	// ... start other services ...
-//	lifecycle.Wait(10 * time.Second) // Wait for shutdown, allowing up to 10 seconds for cleanup
+//	lifecycle.Wait() // Wait for shutdown
 //	log.Println("Application finished shutting down.")
-func (lifecycle *LifecycleManager) Wait(d time.Duration) {
+func (lifecycle *LifecycleManager) Wait() {
 	<-lifecycle.ctx.Done()
-	if d != 0 {
-		time.Sleep(d)
-	}
 }
 
 // Exit initiates a graceful shutdown of the application.
