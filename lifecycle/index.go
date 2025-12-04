@@ -65,6 +65,27 @@ func (lifecycle *LifecycleManager) Wait() {
 	}
 }
 
+// Done returns a channel that is closed when the application is shutting down.
+//
+// Services and background goroutines can select on this channel to listen for
+// the shutdown signal and perform a graceful exit. This is the preferred way to
+// integrate with the lifecycle manager.
+//
+// Example:
+//
+//	go func() {
+//	    select {
+//	    case <-lifecycle.Done():
+//	        log.Println("Shutting down worker...")
+//	        return
+//	    default:
+//	        // ... do work ...
+//	    }
+//	}()
+func (lifecycle *LifecycleManager) Done() <-chan struct{} {
+	return lifecycle.ctx.Done()
+}
+
 // Exit initiates a graceful shutdown of the application.
 //
 // This function cancels the internal context, signaling to all components
