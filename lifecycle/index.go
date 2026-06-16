@@ -2,7 +2,6 @@ package lifecycle
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,8 +15,10 @@ import (
 // components. Create a new instance using New(), and then have your components
 // listen to the context provided by the LifecycleManager to know when to shut down.
 type LifecycleManager struct {
+	options       *Options
 	ctx           context.Context
 	cancel        context.CancelFunc
+	callbackMux   sync.Mutex
 	exitCallbacks []func()
 }
 
@@ -33,12 +34,18 @@ type LifecycleManager struct {
 //	lifecycle.Wait(5 * time.Second) // Wait for shutdown, with a potential 5-second delay
 //
 //	// The application will now shut down gracefully when SIGINT or SIGTERM is received.
-func New() *LifecycleManager {
+func New(opts ...Option) *LifecycleManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	options := defaultOptions()
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	lifecycle := &LifecycleManager{
-		ctx:    ctx,
-		cancel: cancel,
+		options: options,
+		ctx:     ctx,
+		cancel:  cancel,
 	}
 
 	go lifecycle.handleSignals()
@@ -130,7 +137,7 @@ func (lifecycle *LifecycleManager) Exit() {
 //	    // ... continue processing ...
 //	}()
 func (lifecycle *LifecycleManager) Exitf(format string, v ...any) {
-	log.Printf(format, v...)
+	lifecycle.options.printf(format, v...)
 	lifecycle.cancel()
 }
 
@@ -152,7 +159,7 @@ func (lifecycle *LifecycleManager) Exitf(format string, v ...any) {
 //	    // ... continue monitoring ...
 //	}()
 func (lifecycle *LifecycleManager) Exitln(v ...any) {
-	log.Println(v...)
+	lifecycle.options.println(v...)
 	lifecycle.cancel()
 }
 
