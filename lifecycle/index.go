@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 )
 
@@ -67,6 +68,8 @@ func New(opts ...Option) *LifecycleManager {
 //	log.Println("Application finished shutting down.")
 func (lifecycle *LifecycleManager) Wait() {
 	<-lifecycle.ctx.Done()
+	lifecycle.callbackMux.Lock()
+	defer lifecycle.callbackMux.Unlock()
 	for i := len(lifecycle.exitCallbacks); i > 0; i-- {
 		callback := lifecycle.exitCallbacks[i-1]
 		callback()
@@ -183,6 +186,8 @@ func (lifecycle *LifecycleManager) Exitln(v ...any) {
 //	    server.Shutdown(context.Background())
 //	})
 func (lifecycle *LifecycleManager) OnExit(callback func()) {
+	lifecycle.callbackMux.Lock()
+	defer lifecycle.callbackMux.Unlock()
 	lifecycle.exitCallbacks = append(lifecycle.exitCallbacks, callback)
 }
 
