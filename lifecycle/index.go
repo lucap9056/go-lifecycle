@@ -60,7 +60,8 @@ func New() *LifecycleManager {
 //	log.Println("Application finished shutting down.")
 func (lifecycle *LifecycleManager) Wait() {
 	<-lifecycle.ctx.Done()
-	for _, callback := range lifecycle.exitCallbacks {
+	for i := len(lifecycle.exitCallbacks); i > 0; i-- {
+		callback := lifecycle.exitCallbacks[i-1]
 		callback()
 	}
 }
@@ -158,9 +159,10 @@ func (lifecycle *LifecycleManager) Exitln(v ...any) {
 // OnExit registers a function to be executed when the application is shutting down.
 //
 // You can call this function multiple times to register multiple cleanup tasks.
-// The registered functions will be executed in the order they were registered.
-// This is useful for tasks like closing database connections, flushing logs, or
-// waiting for background goroutines to finish.
+// The registered functions will be executed in the reverse order they were
+// registered (LIFO - Last In, First Out). This ensures that dependencies are
+// shut down in the correct order (e.g., stopping a server before closing its
+// database connection).
 //
 // Example:
 //
