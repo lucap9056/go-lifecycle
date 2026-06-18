@@ -21,6 +21,7 @@ type LifecycleManager struct {
 	cancel        context.CancelFunc
 	callbackMux   sync.Mutex
 	exitCallbacks []func()
+	waitOnce      sync.Once
 }
 
 // New creates and returns a new LifecycleManager.
@@ -32,7 +33,7 @@ type LifecycleManager struct {
 // Example usage:
 //
 //	lifecycle := lifecycle.New()
-//	lifecycle.Wait(5 * time.Second) // Wait for shutdown, with a potential 5-second delay
+//	lifecycle.Wait() // Wait for shutdown
 //
 //	// The application will now shut down gracefully when SIGINT or SIGTERM is received.
 func New(opts ...Option) *LifecycleManager {
@@ -68,12 +69,16 @@ func New(opts ...Option) *LifecycleManager {
 //	log.Println("Application finished shutting down.")
 func (lifecycle *LifecycleManager) Wait() {
 	<-lifecycle.ctx.Done()
-	lifecycle.callbackMux.Lock()
-	defer lifecycle.callbackMux.Unlock()
-	for i := len(lifecycle.exitCallbacks); i > 0; i-- {
-		callback := lifecycle.exitCallbacks[i-1]
-		callback()
-	}
+	lifecycle.waitOnce.Do(func() {
+		lifecycle.callbackMux.Lock()
+		callbacks := make([]func(), len(lifecycle.exitCallbacks))
+		copy(callbacks, lifecycle.exitCallbacks)
+		lifecycle.callbackMux.Unlock()
+
+		for i := len(callbacks); i > 0; i-- {
+			callbacks[i-1]()
+		}
+	})
 }
 
 // Done returns a channel that is closed when the application is shutting down.
@@ -187,14 +192,24 @@ func (lifecycle *LifecycleManager) Exitln(v ...any) {
 //	})
 func (lifecycle *LifecycleManager) OnExit(callback func()) {
 	lifecycle.callbackMux.Lock()
-	defer lifecycle.callbackMux.Unlock()
-	lifecycle.exitCallbacks = append(lifecycle.exitCallbacks, callback)
+
+	if lifecycle.ctx.Err() != nil {
+		lifecycle.callbackMux.Unlock()
+		callback()
+	} else {
+		lifecycle.exitCallbacks = append(lifecycle.exitCallbacks, callback)
+		lifecycle.callbackMux.Unlock()
+	}
 }
 
 func (lifecycle *LifecycleManager) handleSignals() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(signalChan)
 
-	<-signalChan
-	lifecycle.cancel()
+	select {
+	case <-signalChan:
+		lifecycle.cancel()
+	case <-lifecycle.ctx.Done():
+	}
 }
