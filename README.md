@@ -43,7 +43,7 @@ func main() {
 
 ### Tier 2: Managed Runner (`lifemanaged`)
 
-Use this for a more declarative approach with centralized error handling.
+Use this for a more declarative approach with centralized error handling. `Run` will block until the provided function returns an error, or a termination signal is received.
 
 ```go
 package main
@@ -62,8 +62,9 @@ func main() {
 
 		fmt.Println("Application is running. Press Ctrl+C to exit.")
 		
-		// Run your server or business logic here
-		// Return error to trigger immediate graceful shutdown
+		// Run your server or business logic here.
+		// If you return nil, lifemanaged.Run will wait for a signal.
+		// If you return an error, it triggers immediate graceful shutdown.
 		return nil 
 	})
 
@@ -96,5 +97,5 @@ lm := lifecycle.New(
 
 ### `lifemanaged` Package
 
-- **`Run(fn func(*lifecycle.LifecycleManager) error, opts ...lifecycle.Option) error`**: Encapsulates the entire lifecycle. Runs the provided function and ensures cleanup is triggered whether the function returns or a signal is received.
+- **`Run(fn func(*lifecycle.LifecycleManager) error, opts ...lifecycle.Option) error`**: Encapsulates the entire lifecycle. Runs the provided function. If the function returns an error, it triggers shutdown immediately. If it returns `nil`, it waits for a termination signal. Cleanup hooks are guaranteed to run before `Run` returns.
 

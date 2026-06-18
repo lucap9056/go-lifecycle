@@ -6,19 +6,12 @@ import (
 
 func Run(callback func(*lifecycle.LifecycleManager) error, opts ...lifecycle.Option) error {
 	lm := lifecycle.New(opts...)
-	errChan := make(chan error, 1)
-	go func() {
-		errChan <- callback(lm)
-	}()
+	err := callback(lm)
 
-	select {
-	case err := <-errChan:
+	if err != nil {
 		lm.Exit()
-		lm.Wait()
-		return err
-	case <-lm.Done():
 	}
 
 	lm.Wait()
-	return nil
+	return err
 }
